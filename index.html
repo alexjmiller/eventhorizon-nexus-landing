@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event Horizon Nexus</title>
+<meta name="description" content="Event Horizon Nexus — the boundary between what is visible and what is about to emerge.">
+<link rel="canonical" href="https://eventhorizon.nexus/">
+<meta property="og:title" content="Event Horizon Nexus">
+<meta property="og:description" content="The boundary between what is visible and what is about to emerge.">
+<meta property="og:url" content="https://eventhorizon.nexus/">
+<style>
+  :root {
+    --fg: #ffffff;
+    --bg: #000000;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    overflow: hidden;
+  }
+  canvas#field {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+    padding: 0 1.5rem;
+  }
+  h1 {
+    font-weight: 100;
+    font-size: clamp(1.4rem, 4.5vw, 3.2rem);
+    letter-spacing: 0.45em;
+    text-indent: 0.45em; /* balance the trailing letter-spacing */
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .tagline {
+    margin-top: 1.6rem;
+    font-weight: 200;
+    font-size: clamp(0.7rem, 1.6vw, 0.95rem);
+    letter-spacing: 0.22em;
+    text-indent: 0.22em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    max-width: 42em;
+    line-height: 2;
+  }
+  .foot {
+    position: fixed;
+    bottom: 1.4rem;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-weight: 200;
+    font-size: 0.62rem;
+    letter-spacing: 0.35em;
+    text-indent: 0.35em;
+    text-transform: uppercase;
+    opacity: 0.3;
+    pointer-events: none;
+  }
+  .fade-in { animation: fadein 2.4s ease-out both; }
+  .fade-in.delay { animation-delay: 0.9s; }
+  @keyframes fadein {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .tagline.fade-in.delay { animation-name: fadein-dim; }
+  @keyframes fadein-dim {
+    from { opacity: 0; }
+    to   { opacity: 0.55; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fade-in { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="field"></canvas>
+<div class="overlay">
+  <h1 class="fade-in">Event Horizon Nexus</h1>
+  <p class="tagline fade-in delay">The boundary between what is visible and what is about to emerge</p>
+</div>
+<div class="foot">eventhorizon.nexus</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('field');
+  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+  if (!gl) return; // black page with title still stands on its own
+
+  const VERT = `#version 300 es
+  in vec2 aPos;
+  void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+  const FRAG = `#version 300 es
+  precision highp float;
+  uniform vec2  uRes;
+  uniform float uTime;
+  uniform vec2  uDrift;   // eased mouse offset, -1..1
+  out vec4 outColor;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  // bright line where v crosses half-integers, anti-aliased via derivatives
+  float gridLine(float v, float w) {
+    float f = fwidth(v);
+    return smoothstep(w + f, w - f, abs(fract(v) - 0.5));
+  }
+
+  void main() {
+    vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+    uv += uDrift * 0.05;
+
+    float r = length(uv);
+    float a = atan(uv.y, uv.x);
+
+    // tunnel projection: depth grows toward the centre
+    float z     = 0.30 / (r + 1e-3);
+    float depth = z + uTime * 0.45;          // forward motion into the horizon
+    float roll  = 0.06 * sin(uTime * 0.05);  // barely-there camera roll
+    float ang   = (a + roll) / 6.28318530718;
+
+    // spacetime lattice: rings are slices of time, spokes are world-lines
+    float rings  = gridLine(depth, 0.035);
+    float spokes = gridLine(ang * 48.0 + depth * 0.018, 0.030);
+    float lattice = max(rings, spokes * 0.75);
+
+    // fade with distance, and swallow everything near the horizon itself
+    float fog  = exp(-z * 0.13);
+    float hole = smoothstep(0.015, 0.16, r);
+    float vig  = 1.0 - 0.45 * smoothstep(0.55, 1.15, r);
+
+    float c = lattice * fog * hole * vig;
+
+    // a thin luminous rim where the lattice meets the dark
+    c += 0.20 * exp(-abs(r - 0.115) * 55.0);
+
+    // an occasional wavefront emerging from the horizon — time unfolding
+    float t   = fract(uTime * 0.045);
+    float pos = 0.10 + t * 1.15;
+    float wave = exp(-abs(r - pos) * 90.0) * (1.0 - t) * 0.35;
+    c += wave * hole;
+
+    // subtle grain to kill banding
+    c += (hash(gl_FragCoord.xy + fract(uTime)) - 0.5) * 0.035;
+
+    c = clamp(c, 0.0, 1.0);
+    outColor = vec4(vec3(c), 1.0);
+  }`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      return null;
+    }
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  // full-screen triangle
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  const uRes   = gl.getUniformLocation(prog, 'uRes');
+  const uTime  = gl.getUniformLocation(prog, 'uTime');
+  const uDrift = gl.getUniformLocation(prog, 'uDrift');
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = Math.round(innerWidth * dpr);
+    canvas.height = Math.round(innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  // eased pointer parallax
+  let mx = 0, my = 0, dx = 0, dy = 0;
+  addEventListener('pointermove', e => {
+    mx = (e.clientX / innerWidth)  * 2 - 1;
+    my = (e.clientY / innerHeight) * 2 - 1;
+  });
+
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const start = performance.now();
+
+  function frame(now) {
+    const t = (now - start) / 1000;
+    dx += (mx - dx) * 0.04;
+    dy += (my - dy) * 0.04;
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, reduced ? 0 : t);
+    gl.uniform2f(uDrift, dx, -dy);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (!reduced) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
