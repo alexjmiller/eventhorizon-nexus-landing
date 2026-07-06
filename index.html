@@ -140,6 +140,26 @@
     return smoothstep(w + f, w - f, abs(fract(v) - 0.5));
   }
 
+  // an expanding hoop of fine dust: one particle per angular cell, with
+  // hashed position scatter, size, brightness, and a slow swirl + flicker
+  float dustRing(float r, float a, float phase, float seed, float px) {
+    float t   = fract(uTime * 0.045 + phase);
+    float pos = 0.10 + t * 1.15;
+    float N   = 150.0;
+    float coord = (a + uTime * 0.02) / 6.28318530718 * N;
+    float cell  = floor(coord);
+    float h1 = hash(vec2(cell, seed));
+    float h2 = hash(vec2(cell, seed + 5.0));
+    float h3 = hash(vec2(cell, seed + 9.0));
+    float rDot = pos * (1.0 + (h2 - 0.5) * 0.14);          // radial scatter
+    float da   = (fract(coord) - (0.15 + 0.7 * h1)) / N * 6.28318530718;
+    float d    = length(vec2(r - rDot, da * r));           // local distance to the particle
+    float size = px * (1.2 + 2.0 * h3);
+    float dotb = smoothstep(size, 0.0, d);
+    float twinkle = 0.7 + 0.3 * sin(uTime * (3.0 + 5.0 * h2) + h1 * 40.0);
+    return dotb * (0.25 + 0.75 * h3) * twinkle * (1.0 - t) * 0.9;
+  }
+
   void main() {
     vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
     uv += uDrift * 0.03;
@@ -149,11 +169,14 @@
     // must be solved self-consistently (depth is measured from the displaced
     // centre, which itself depends on depth) — a one-shot displacement warps
     // space like a lens instead of bending the tunnel.
+    // the offset profile must have bounded slope (|swing| * max|w'| < 1) or
+    // the mapping folds over and mirror-duplicates the deep tunnel at large
+    // deflections — hence smoothstep falloff rather than 1/r depth
     vec2 swing = vec2(uDrift.x, uDrift.y * 0.4) * 0.26;
     vec2 c0 = vec2(0.0);
     for (int i = 0; i < 4; i++) {
-      float zz = min(0.30 / (length(uv - c0) + 1e-3), 10.0);
-      c0 = swing * (zz * 0.1);
+      float rr = length(uv - c0);
+      c0 = swing * (1.0 - smoothstep(0.0, 0.62, rr));
     }
     uv -= c0;
 
@@ -184,11 +207,9 @@
     // a thin luminous rim where the lattice meets the dark
     c += 0.20 * exp(-abs(r - 0.105) * 55.0);
 
-    // an occasional wavefront emerging from the horizon — time unfolding
-    float t   = fract(uTime * 0.045);
-    float pos = 0.10 + t * 1.15;
-    float wave = exp(-abs(r - pos) * 90.0) * (1.0 - t) * 0.35;
-    c += wave * hole;
+    // pulse hoops of drifting space dust unfolding from the horizon
+    c += dustRing(r, a, 0.0,  3.0, px) * hole;
+    c += dustRing(r, a, 0.5, 17.0, px) * hole;
 
     // subtle grain to kill banding
     c += (hash(gl_FragCoord.xy + fract(uTime)) - 0.5) * 0.035;
