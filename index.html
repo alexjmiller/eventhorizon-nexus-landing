@@ -133,6 +133,7 @@
   uniform vec2  uRes;
   uniform float uTime;
   uniform vec2  uDrift;   // eased mouse offset, -1..1
+  uniform vec2  uDustC;   // dust origin — slowly trails the bent tunnel end
   out vec4 outColor;
 
   float hash(vec2 p) {
@@ -190,8 +191,8 @@
   }
 
   void main() {
-    vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
-    uv += uDrift * 0.03;
+    vec2 uvBase = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+    vec2 uv = uvBase + uDrift * 0.03;
     float px = 1.5 / uRes.y;
 
     // bend the tube: the far end swings toward the pointer. The centre offset
@@ -238,10 +239,11 @@
     // c += 0.20 * exp(-abs(r - 0.105) * 55.0);
 
     // continuous stream of space dust flowing out of the horizon — several
-    // independent layers, every particle on its own schedule. Dust floats
-    // inside the tube, so it gets 50% extra swing: visible parallax against
-    // the walls when the pointer bends the tunnel.
-    vec2 uvD  = uv - c0 * 0.5;
+    // independent layers, every particle on its own schedule. Dust lives in a
+    // fixed screen frame (mouse moves don't drag it); its origin trails the
+    // bent tunnel end slowly via uDustC, so new particles emanate from
+    // wherever the far end has settled.
+    vec2 uvD  = uvBase - uDustC;
     float rD  = length(uvD);
     float aD  = at2(uvD);
     float holeD = smoothstep(0.008, 0.115, rD);
@@ -284,6 +286,7 @@
   const uRes   = gl.getUniformLocation(prog, 'uRes');
   const uTime  = gl.getUniformLocation(prog, 'uTime');
   const uDrift = gl.getUniformLocation(prog, 'uDrift');
+  const uDustC = gl.getUniformLocation(prog, 'uDustC');
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -303,14 +306,22 @@
 
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const start = performance.now();
+  let cx = 0, cy = 0, prev = start; // dust origin, slowly trailing the bent tunnel end
 
   function frame(now) {
     const t = (now - start) / 1000;
+    const dt = Math.min((now - prev) / 1000, 0.1);
+    prev = now;
     dx += (mx - dx) * 0.04;
     dy += (my - dy) * 0.04;
+    // where the shader puts the far end: swing = (drift.x, drift.y * 0.4) * 0.26
+    const k = 1 - Math.exp(-dt / 3.5); // ~3.5s time constant
+    cx += (dx * 0.26 - cx) * k;
+    cy += (-dy * 0.4 * 0.26 - cy) * k;
     gl.uniform2f(uRes, canvas.width, canvas.height);
     gl.uniform1f(uTime, reduced ? 0 : t);
     gl.uniform2f(uDrift, dx, -dy);
+    gl.uniform2f(uDustC, cx, cy);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     if (!reduced) requestAnimationFrame(frame);
   }
