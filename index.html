@@ -159,14 +159,16 @@
     float h1 = hash(vec2(cell, rs));
     float h2 = hash(vec2(cell, rs + 5.0));
     float h3 = hash(vec2(cell, rs + 9.0));
-    float pos  = 0.10 + t * 1.15;
+    // true perspective: constant speed along the tube axis reads on screen as
+    // r = 0.3/z — barely creeping near the horizon, accelerating outward
+    float pos  = 0.30 / (3.0 - 2.76 * t);
     float rDot = pos * (1.0 + (h2 - 0.5) * 0.14);          // radial scatter
     float da   = (fract(coord) - (0.15 + 0.7 * h1)) / N * 6.28318530718;
     float d    = length(vec2(r - rDot, da * r));           // local distance to the particle
     float size = px * (1.2 + 2.0 * h3);
     float dotb = smoothstep(size, 0.0, d);
     float twinkle = 0.7 + 0.3 * sin(uTime * (3.0 + 5.0 * h2) + h1 * 40.0);
-    float life = smoothstep(0.0, 0.08, t) * (1.0 - t);     // ease in, fade out
+    float life = smoothstep(0.0, 0.08, t) * (1.0 - t * t); // ease in, stay lit through the fast leg
     return dotb * (0.25 + 0.75 * h3) * twinkle * life * 0.9;
   }
 
@@ -218,9 +220,15 @@
     c += 0.20 * exp(-abs(r - 0.105) * 55.0);
 
     // continuous stream of space dust flowing out of the horizon — several
-    // independent layers, every particle on its own schedule
+    // independent layers, every particle on its own schedule. Dust floats
+    // inside the tube, so it gets 50% extra swing: visible parallax against
+    // the walls when the pointer bends the tunnel.
+    vec2 uvD  = uv - c0 * 0.5;
+    float rD  = length(uvD);
+    float aD  = at2(uvD);
+    float holeD = smoothstep(0.012, 0.145, rD);
     for (int i = 0; i < 5; i++) {
-      c += dustLayer(r, a, float(i) * 0.2, 3.0 + float(i) * 7.3, px) * hole;
+      c += dustLayer(rD, aD, float(i) * 0.2, 3.0 + float(i) * 7.3, px) * holeD;
     }
 
     // subtle grain to kill banding
