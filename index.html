@@ -144,27 +144,30 @@
     return smoothstep(w + f, w - f, abs(fract(v) - 0.5));
   }
 
-  // an expanding hoop of fine dust: one particle per angular cell, with
-  // hashed position scatter, size, brightness, and a slow swirl + flicker.
-  // Each emission cycle rolls its own particle count (100-300) and pattern.
-  float dustRing(float r, float a, float phase, float seed, float px) {
-    float cyc = uTime * 0.045 + phase;
-    float t   = fract(cyc);
-    float k   = floor(cyc);          // emission index — reseeds every cycle
-    float pos = 0.10 + t * 1.15;
-    float N   = floor(100.0 + 200.0 * hash(vec2(k, seed + 1.5)));
+  // a layer of streaming dust: one particle per angular cell, each on its own
+  // random birth schedule (no shared wavefront), drifting outward from the
+  // horizon and reborn with fresh size/brightness/position when it dies
+  float dustLayer(float r, float a, float phase, float seed, float px) {
+    float N = 200.0;
     float coord = (a + uTime * 0.02) / 6.28318530718 * N;
     float cell  = floor(coord);
-    float h1 = hash(vec2(cell, seed + k * 31.7));
-    float h2 = hash(vec2(cell, seed + k * 31.7 + 5.0));
-    float h3 = hash(vec2(cell, seed + k * 31.7 + 9.0));
+    float hp  = hash(vec2(cell, seed + 2.7));   // per-particle phase offset
+    float cyc = uTime * 0.045 + phase + hp;
+    float t   = fract(cyc);
+    float k   = floor(cyc);                      // rebirth index — reseeds each life
+    float rs  = seed + k * 31.7;
+    float h1 = hash(vec2(cell, rs));
+    float h2 = hash(vec2(cell, rs + 5.0));
+    float h3 = hash(vec2(cell, rs + 9.0));
+    float pos  = 0.10 + t * 1.15;
     float rDot = pos * (1.0 + (h2 - 0.5) * 0.14);          // radial scatter
     float da   = (fract(coord) - (0.15 + 0.7 * h1)) / N * 6.28318530718;
     float d    = length(vec2(r - rDot, da * r));           // local distance to the particle
     float size = px * (1.2 + 2.0 * h3);
     float dotb = smoothstep(size, 0.0, d);
     float twinkle = 0.7 + 0.3 * sin(uTime * (3.0 + 5.0 * h2) + h1 * 40.0);
-    return dotb * (0.25 + 0.75 * h3) * twinkle * (1.0 - t) * 0.9;
+    float life = smoothstep(0.0, 0.08, t) * (1.0 - t);     // ease in, fade out
+    return dotb * (0.25 + 0.75 * h3) * twinkle * life * 0.9;
   }
 
   void main() {
@@ -214,10 +217,10 @@
     // a thin luminous rim where the lattice meets the dark
     c += 0.20 * exp(-abs(r - 0.105) * 55.0);
 
-    // continuous stream of space dust unfolding from the horizon: five
-    // staggered emissions, so a new wave is always being born as one dies
+    // continuous stream of space dust flowing out of the horizon — several
+    // independent layers, every particle on its own schedule
     for (int i = 0; i < 5; i++) {
-      c += dustRing(r, a, float(i) * 0.2, 3.0 + float(i) * 7.3, px) * hole;
+      c += dustLayer(r, a, float(i) * 0.2, 3.0 + float(i) * 7.3, px) * hole;
     }
 
     // subtle grain to kill banding
