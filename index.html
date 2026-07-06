@@ -181,7 +181,11 @@
     float size = px * (1.2 + 2.0 * h3);
     float dotb = smoothstep(size, 0.0, d);
     float twinkle = 0.7 + 0.3 * sin(uTime * (3.0 + 5.0 * h2) + h1 * 40.0);
-    float life = smoothstep(0.0, 0.08, t) * (1.0 - t * t); // ease in, stay lit through the fast leg
+    // half the particles burn out mid-flight, half stay lit all the way off
+    // the screen edge (their cycle ends at r=1.25, safely outside the frame)
+    float h4 = hash(vec2(cell, rs + 13.0));
+    float fade = h4 < 0.5 ? 1.0 - smoothstep(0.35, 0.85, t) : 1.0;
+    float life = smoothstep(0.0, 0.08, t) * fade;
     return dotb * (0.25 + 0.75 * h3) * twinkle * life * 0.9;
   }
 
