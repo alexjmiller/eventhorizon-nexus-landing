@@ -81,6 +81,19 @@
     opacity: 0.3;
     pointer-events: none;
   }
+  /* portrait phones: the desktop tracking is wider than the screen and clips
+     the first/last glyphs — tighten it and let the size follow the viewport */
+  @media (max-width: 600px) {
+    h1 {
+      font-size: 4.6vw;
+      letter-spacing: 0.26em;
+      text-indent: 0.26em;
+    }
+    .tagline {
+      letter-spacing: 0.16em;
+      text-indent: 0.16em;
+    }
+  }
   .fade-in { animation: fadein 2.4s ease-out both; }
   .fade-in.delay { animation-delay: 0.9s; }
   @keyframes fadein {
@@ -217,7 +230,8 @@
     float c = lattice * fog * hole * vig;
 
     // a thin luminous rim where the lattice meets the dark
-    c += 0.20 * exp(-abs(r - 0.105) * 55.0);
+    // (disabled for a cleaner look — restore by uncommenting)
+    // c += 0.20 * exp(-abs(r - 0.105) * 55.0);
 
     // continuous stream of space dust flowing out of the horizon — several
     // independent layers, every particle on its own schedule. Dust floats
