@@ -145,10 +145,17 @@
     uv += uDrift * 0.03;
     float px = 1.5 / uRes.y;
 
-    // bend the tube: deeper slices are displaced further in the direction of
-    // the pointer, curving the tunnel instead of just sliding it
-    float z0 = min(0.30 / (length(uv) + 1e-3), 10.0);
-    uv -= vec2(uDrift.x, uDrift.y * 0.4) * 0.045 * z0;
+    // bend the tube: the far end swings toward the pointer. The centre offset
+    // must be solved self-consistently (depth is measured from the displaced
+    // centre, which itself depends on depth) — a one-shot displacement warps
+    // space like a lens instead of bending the tunnel.
+    vec2 swing = vec2(uDrift.x, uDrift.y * 0.4) * 0.26;
+    vec2 c0 = vec2(0.0);
+    for (int i = 0; i < 4; i++) {
+      float zz = min(0.30 / (length(uv - c0) + 1e-3), 10.0);
+      c0 = swing * (zz * 0.1);
+    }
+    uv -= c0;
 
     float r = length(uv);
     float a = at2(uv);
