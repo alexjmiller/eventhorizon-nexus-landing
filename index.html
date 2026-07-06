@@ -9,6 +9,10 @@
 <meta property="og:title" content="Event Horizon Nexus">
 <meta property="og:description" content="The boundary between what is visible and what is about to emerge.">
 <meta property="og:url" content="https://eventhorizon.nexus/">
+<meta property="og:image" content="https://eventhorizon.nexus/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   :root {
     --fg: #ffffff;
@@ -141,16 +145,19 @@
   }
 
   // an expanding hoop of fine dust: one particle per angular cell, with
-  // hashed position scatter, size, brightness, and a slow swirl + flicker
+  // hashed position scatter, size, brightness, and a slow swirl + flicker.
+  // Each emission cycle rolls its own particle count (100-300) and pattern.
   float dustRing(float r, float a, float phase, float seed, float px) {
-    float t   = fract(uTime * 0.045 + phase);
+    float cyc = uTime * 0.045 + phase;
+    float t   = fract(cyc);
+    float k   = floor(cyc);          // emission index — reseeds every cycle
     float pos = 0.10 + t * 1.15;
-    float N   = 300.0;
+    float N   = floor(100.0 + 200.0 * hash(vec2(k, seed + 1.5)));
     float coord = (a + uTime * 0.02) / 6.28318530718 * N;
     float cell  = floor(coord);
-    float h1 = hash(vec2(cell, seed));
-    float h2 = hash(vec2(cell, seed + 5.0));
-    float h3 = hash(vec2(cell, seed + 9.0));
+    float h1 = hash(vec2(cell, seed + k * 31.7));
+    float h2 = hash(vec2(cell, seed + k * 31.7 + 5.0));
+    float h3 = hash(vec2(cell, seed + k * 31.7 + 9.0));
     float rDot = pos * (1.0 + (h2 - 0.5) * 0.14);          // radial scatter
     float da   = (fract(coord) - (0.15 + 0.7 * h1)) / N * 6.28318530718;
     float d    = length(vec2(r - rDot, da * r));           // local distance to the particle
@@ -207,9 +214,11 @@
     // a thin luminous rim where the lattice meets the dark
     c += 0.20 * exp(-abs(r - 0.105) * 55.0);
 
-    // pulse hoops of drifting space dust unfolding from the horizon
-    c += dustRing(r, a, 0.0,  3.0, px) * hole;
-    c += dustRing(r, a, 0.5, 17.0, px) * hole;
+    // continuous stream of space dust unfolding from the horizon: five
+    // staggered emissions, so a new wave is always being born as one dies
+    for (int i = 0; i < 5; i++) {
+      c += dustRing(r, a, float(i) * 0.2, 3.0 + float(i) * 7.3, px) * hole;
+    }
 
     // subtle grain to kill banding
     c += (hash(gl_FragCoord.xy + fract(uTime)) - 0.5) * 0.035;
