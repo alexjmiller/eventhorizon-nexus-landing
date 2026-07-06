@@ -227,8 +227,8 @@
     float lattice = max(rings, spokes * 0.75);
 
     // fade with distance, and swallow everything near the horizon itself
-    float fog  = exp(-z * 0.115);
-    float hole = smoothstep(0.012, 0.145, r);
+    float fog  = exp(-z * 0.085);
+    float hole = smoothstep(0.008, 0.115, r);
     float vig  = 1.0 - 0.45 * smoothstep(0.55, 1.15, r);
 
     float c = lattice * fog * hole * vig;
@@ -244,7 +244,7 @@
     vec2 uvD  = uv - c0 * 0.5;
     float rD  = length(uvD);
     float aD  = at2(uvD);
-    float holeD = smoothstep(0.012, 0.145, rD);
+    float holeD = smoothstep(0.008, 0.115, rD);
     for (int i = 0; i < 5; i++) {
       c += dustLayer(rD, aD, float(i) * 0.2, 3.0 + float(i) * 7.3, px) * holeD;
     }
