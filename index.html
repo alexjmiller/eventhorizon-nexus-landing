@@ -191,10 +191,10 @@
     float ang   = (a + roll + spin) / 6.28318530718;
 
     // spacetime lattice: rings are slices of time, spokes are world-lines
-    float spokeCoord = ang * 48.0 + depth * 0.018;
-    float fSpoke = (48.0 / 6.28318530718) * px / max(r, 1e-3); // analytic width, seam-free
+    float spokeCoord = ang * 24.0 + depth * 0.018;
+    float fSpoke = (24.0 / 6.28318530718) * px / max(r, 1e-3); // analytic width, seam-free
     float rings  = gridLine(depth, 0.0035, fwidth(depth));
-    float spokes = gridLine(spokeCoord, 0.030, fSpoke);
+    float spokes = gridLine(spokeCoord, 0.015, fSpoke);
     float lattice = max(rings, spokes * 0.75);
 
     // fade with distance, and swallow everything near the horizon itself
